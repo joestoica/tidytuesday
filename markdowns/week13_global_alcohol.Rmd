@@ -1,0 +1,65 @@
+---
+title: 'Week 13: Global Alcohol Consumption'
+author: Joe Stoica
+date: 6/28/2018
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggthemes)
+library(kableExtra)
+```
+
+```{r read in data}
+consumption <- read_csv("C:/Users/Joe/Documents/Github/tidytuesday/data/week13_alcohol_global.csv")
+```
+
+```{r 538 table remake}
+# TODO make this into a functrion
+ 
+beer <- consumption %>% 
+  select(country, Beer = beer_servings) %>% 
+  top_n(10) %>% 
+  arrange(desc(Beer))
+
+spirit <- consumption %>% 
+  select(country, Spirit = spirit_servings) %>% 
+  top_n(10) %>% 
+  arrange(desc(Spirit))
+
+wine <- consumption %>% 
+  select(country, Wine = wine_servings) %>% 
+  top_n(10) %>% 
+  arrange(desc(Wine))
+
+alcohol <- bind_cols(beer, spirit, wine)
+
+alcohol %>% 
+  kable(caption = "Who Drinks The Most Beer, Spirits, And Wine?",
+        col.names = c("", "BEER", "", "SPIRIT", "", "WINE")) %>% 
+  kable_styling() 
+```
+
+
+```{r top 20 plot}
+consumption %>% 
+  top_n(20) %>% 
+  select(country, Beer = beer_servings, Spirits = spirit_servings, Wine =  wine_servings) %>% 
+  gather(key = drink, value = qty, -country) %>% 
+  ggplot(aes(reorder(country, qty), qty, fill = drink)) +
+  geom_bar(stat = "identity") +
+  theme_fivethirtyeight() +
+  coord_flip() +
+  theme(axis.title = element_text(),
+        axis.title.y = element_blank(),
+        legend.position = "right",
+        legend.direction = "vertical",
+        plot.title = element_text(hjust = .9)) +
+  ylab("Servings") +
+  ggtitle("Top 20 Consumers of Pure Alcohol By Drink Type") +
+  guides(fill=guide_legend(title="Type of Drink")) +
+  scale_fill_manual(values = c("#fb8072", "#80b1d3", "#77dd77"))
+```
+
