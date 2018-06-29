@@ -1,7 +1,7 @@
 ---
 title: 'Week 13: Global Alcohol Consumption'
 author: Joe Stoica
-date: 6/28/2018
+date: 6/29/2018
 output: html_document
 ---
 
@@ -9,11 +9,16 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(ggthemes)
+library(knitr)
 library(kableExtra)
 ```
 
 ```{r read in data}
-consumption <- read_csv("C:/Users/Joe/Documents/Github/tidytuesday/data/week13_alcohol_global.csv")
+# Windows
+#consumption <- read_csv("C:/Users/Joe/Documents/Github/tidytuesday/data/week13_alcohol_global.csv")
+
+# Mac
+consumption <- read_csv("/Users/Joe/Documents/Github/tidytuesday/data/week13_alcohol_global.csv")
 ```
 
 ```{r 538 table remake}
@@ -53,14 +58,11 @@ top20 <- consumption %>%
   gather(key = drink, value = qty, -country) %>% 
   group_by(country)
 
-top20$drink <- factor(top20$drink, levels = top20$drink)
 
-top20 %>% 
-  ggplot(aes(reorder(country, qty),
-             qty, 
-             fill = drink, 
-             order = as.numeric(drink))) +
-  geom_bar(stat = "identity") +
+plot <- ggplot(top20, aes(reorder(country, qty),
+                  qty,
+                  fill = drink)) +
+  geom_bar(stat = "identity")+
   theme_fivethirtyeight() +
   coord_flip() +
   theme(axis.title = element_text(),
@@ -70,16 +72,24 @@ top20 %>%
         legend.text = element_text(size = 14)) +
   ylab("Servings") +
   ggtitle("Top 20 Consumers of Pure Alcohol By Drink Type") +
-  guides(fill = guide_legend(keywidth = 3, keyheight = .75, title=NULL, label.position = "top", label.hjust = 0.5,
-                             guide_legend(order = 1)))) +
-  scale_fill_manual(values = c("#fb8072", "#80b1d3", "#77dd77"))
+
+  guides(fill = guide_legend(keywidth = 3,
+                             keyheight = .75, 
+                             title=NULL, 
+                             label.position = "top", 
+                             label.hjust = 0.5,
+                             reverse = TRUE)) +
+  scale_fill_manual(values = c("#0392cf", "#7bc043", "#ee4035"))
+
+plot
+
 
 #ggsave("top20.png", plot)
 ```
 
 ```{r sankey}
 library(devtools)
-# install_github("mages/googleVis")
+install_github("mages/googleVis")
 require(googleVis)
 
 sankey <- plot(gvisSankey(top10,
@@ -91,4 +101,6 @@ sankey <- plot(gvisSankey(top10,
                             sankey = "{link:{color:{fill:'light blue'}}}"
                           )))
 ```
+
+
 
