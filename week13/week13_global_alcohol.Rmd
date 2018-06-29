@@ -53,8 +53,13 @@ top20 <- consumption %>%
   gather(key = drink, value = qty, -country) %>% 
   group_by(country)
 
-plot <- top20 %>% 
-  ggplot(aes(reorder(country, qty), qty, fill = drink)) +
+top20$drink <- factor(top20$drink, levels = top20$drink)
+
+top20 %>% 
+  ggplot(aes(reorder(country, qty),
+             qty, 
+             fill = drink, 
+             order = as.numeric(drink))) +
   geom_bar(stat = "identity") +
   theme_fivethirtyeight() +
   coord_flip() +
@@ -65,10 +70,11 @@ plot <- top20 %>%
         legend.text = element_text(size = 14)) +
   ylab("Servings") +
   ggtitle("Top 20 Consumers of Pure Alcohol By Drink Type") +
-  guides(fill = guide_legend(keywidth = 3, keyheight = .75, title=NULL, label.position = "top", label.hjust = 0.5)) +
+  guides(fill = guide_legend(keywidth = 3, keyheight = .75, title=NULL, label.position = "top", label.hjust = 0.5,
+                             guide_legend(order = 1)))) +
   scale_fill_manual(values = c("#fb8072", "#80b1d3", "#77dd77"))
 
-ggsave("top20.png", plot)
+#ggsave("top20.png", plot)
 ```
 
 ```{r sankey}
