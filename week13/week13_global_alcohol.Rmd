@@ -17,8 +17,6 @@ consumption <- read_csv("C:/Users/Joe/Documents/Github/tidytuesday/data/week13_a
 ```
 
 ```{r 538 table remake}
-# TODO make this into a functrion
- 
 beer <- consumption %>% 
   select(country, Beer = beer_servings) %>% 
   top_n(10) %>% 
@@ -42,12 +40,20 @@ alcohol %>%
   kable_styling() 
 ```
 
-
 ```{r top 20 plot}
-consumption %>% 
+top10 <- consumption %>% 
+  top_n(10) %>% 
+  select(country, Beer = beer_servings, Spirits = spirit_servings, Wine =  wine_servings) %>% 
+  gather(key = drink, value = qty, -country) %>% 
+  group_by(country)
+
+top20 <- consumption %>% 
   top_n(20) %>% 
   select(country, Beer = beer_servings, Spirits = spirit_servings, Wine =  wine_servings) %>% 
   gather(key = drink, value = qty, -country) %>% 
+  group_by(country)
+
+plot <- top20 %>% 
   ggplot(aes(reorder(country, qty), qty, fill = drink)) +
   geom_bar(stat = "identity") +
   theme_fivethirtyeight() +
@@ -61,4 +67,22 @@ consumption %>%
   ggtitle("Top 20 Consumers of Pure Alcohol By Drink Type") +
   guides(fill = guide_legend(keywidth = 3, keyheight = .75, title=NULL, label.position = "top", label.hjust = 0.5)) +
   scale_fill_manual(values = c("#fb8072", "#80b1d3", "#77dd77"))
+
+ggsave("top20.png", plot)
 ```
+
+```{r sankey}
+library(devtools)
+# install_github("mages/googleVis")
+require(googleVis)
+
+sankey <- plot(gvisSankey(top10,
+                          from = "country",
+                          to = "drink",
+                          weight = "qty",
+                          option = "list"(
+                            height = 750,
+                            sankey = "{link:{color:{fill:'light blue'}}}"
+                          )))
+```
+
