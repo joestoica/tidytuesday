@@ -72,7 +72,6 @@ plot <- ggplot(top20, aes(reorder(country, qty),
         legend.text = element_text(size = 14)) +
   ylab("Servings") +
   ggtitle("Top 20 Consumers of Pure Alcohol By Drink Type") +
-
   guides(fill = guide_legend(keywidth = 3,
                              keyheight = .75, 
                              title=NULL, 
