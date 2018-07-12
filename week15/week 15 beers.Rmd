@@ -1,0 +1,230 @@
+---
+title: "Week 15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggthemes)
+library(kableExtra)
+library(ggridges)
+library(readxl)
+```
+
+```{r join data}
+beers <- read_xlsx("/Users/Joe/Documents/Github/tidytuesday/data/week15_beers.xlsx", sheet = 1)
+breweries <- read_xlsx("/Users/Joe/Documents/Github/tidytuesday/data/week15_beers.xlsx", sheet = 2)
+
+names(beers)[5] <- "beer_name" 
+names(breweries)[5] <- "brewery_id" 
+
+beers <- beers %>% 
+  left_join(breweries, by = "brewery_id") %>% 
+  select(-count.x, -count.y, -id)
+rm(breweries)
+
+# Add full state name to df
+beers <- beers %>% 
+  mutate(region = tolower(state.name[match(beers$state, state.abb)]))
+
+# Capitalize state names
+beers$region <- gsub("(\\b[a-z]{1})", "\\U\\1" , beers$region, perl=TRUE)
+```
+
+
+```{r warning=FALSE}
+beers_style <- beers %>% 
+  filter(style %in% top_10_styles$style)
+
+beers_style$style <- fct_rev(factor(beers_style$style, levels = c("American IPA", "American Pale Ale (APA)", "American Amber / Red Ale", "American Blonde Ale", "American Double / Imperial IPA", "American Pale Wheat Ale", "American Brown Ale", "American Porter", "Saison / Farmhouse Ale", "Witbier")))
+
+joyplot <- beers_style %>% 
+  ggplot(aes(x = ibu, y = style)) +
+  geom_density_ridges(fill = "#6093ca") + 
+  theme_fivethirtyeight() +
+  theme(axis.title = element_text(),
+        axis.title.y = element_blank(),
+        plot.caption = element_text(size = 8),
+        plot.title = element_text(hjust = 1,
+                                  size = 15)) +
+  xlab("IBU") +
+  labs(title = "How bitter are the 10 Most Popular Beer Styles?",
+       caption = "@Joe_Stoica") + 
+  scale_x_continuous(breaks = seq(0,150,10))
+ggsave(joyplot, filename = "joyplot.png")
+```
+
+```{r}
+# Gets the top 10 styles
+top_10_styles <- beers %>% 
+  group_by(style) %>%  
+  count() %>% 
+  arrange(desc(n)) %>% 
+  ungroup() %>% 
+  top_n(10) %>% 
+  left_join(beers %>% group_by(style) %>% summarise(Mean_ABV = mean(na.omit(abv)) * 100,
+                                                    Mean_IBU = mean(na.omit(ibu)))) 
+# Cleaning for table output
+top_10_styles$Mean_ABV <- round(top_10_styles$Mean_ABV, 2)
+top_10_styles$Mean_IBU <- round(top_10_styles$Mean_IBU, 2)
+top_10_styles$Mean_ABV <- paste(top_10_styles$Mean_ABV, "%")
+
+top_10_styles %>% 
+  kable(caption = "Top 10 Beer Styles from U.S. Craft Breweries (NA values omitted)",
+        col.names = c("Beer Style", "Count", "Mean ABV", "Mean IBU"),
+        align = c("l","c", "c", "c")) %>% 
+  kable_styling() 
+```
+
+```{r}
+library(ggrepel)
+library(scales)
+
+scatter <- beers %>% 
+  group_by(style) %>%  
+  summarise(mean_ABV = mean(na.omit(abv)),
+            mean_IBU = mean(na.omit(ibu)),
+            n = n()) %>% 
+  ggplot(aes(mean_ABV, mean_IBU)) + 
+  geom_point(color = "#ff6961",
+             aes(size = n)) +
+  geom_text_repel(aes(label = ifelse(n >= 50, style, "")),
+                  size = 3.5,
+                  box.padding = unit(0.7, "lines")) +
+  theme_fivethirtyeight()+
+  theme(axis.text = element_text(),
+        axis.title = element_text(),
+        plot.caption = element_text(size = 8),
+        plot.title = element_text(hjust = 0.5),
+        legend.position = "top") +
+  xlab("Mean ABV") + 
+  ylab("Mean IBU") +
+  labs(title = "ABV vs. IBU",
+       caption = "@Joe_Stoica",
+       size = "") +
+  scale_x_continuous(breaks = seq(0, .1, .02),
+                     labels = percent) 
+ggsave(scatter, filename = "scatter.png")
+```
+
+```{r warning=FALSE}
+top_5 <- beers %>% 
+  group_by(region) %>% 
+  summarise(n = length(unique(name))) %>% 
+  arrange(desc(n)) %>% 
+  ungroup() %>% 
+  top_n(5) 
+
+top_5$region <- fct_rev(factor(top_5$region, levels = c("Colorado", "California", "Michigan", "Oregon", "Texas" )))
+
+remake <- top_5 %>% 
+  ggplot(aes(region, n)) +
+  geom_bar(stat = "identity", 
+           fill = "#f48444",
+           width = 0.5) +
+  # States
+  geom_text(aes(label = region),
+            size = 6,
+            hjust = 1.15,
+            vjust = 0.4) + 
+  # Numbers
+  geom_text(aes(label = n),
+            size = 6,
+            hjust = -.15) +
+  coord_flip() +
+  theme_fivethirtyeight() +
+  theme(axis.ticks.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.title = element_blank(),
+        plot.title = element_text(hjust = 0.5),
+        plot.caption = element_text(size = 8),
+        panel.background = element_blank(),
+        axis.line.x = element_line(colour = "dark grey",
+                                   linetype = 2),
+        panel.grid.major = element_blank()) + 
+  labs(title = "Top Five States With the Most Breweries",
+       caption = "@Joe_Stoica")
+ggsave(remake, filename = "remake.png")
+```
+
+```{r}
+boxplot <- beers %>% 
+  filter(region %in% c("Colorado", "California", 
+                       "Michigan", "Oregon", "Texas" )) %>% 
+  ggplot(aes(x = region, y = ibu)) + 
+  geom_boxplot(outlier.color = "red") + 
+  theme_fivethirtyeight() +
+  theme(axis.title = element_text(),
+        axis.title.x = element_blank(),
+        plot.caption = element_text(size = 8),
+        plot.title = element_text(hjust = 0.5,
+                                  size = 15)) +
+  ylab("IBU") +
+  labs(title = "IBU Distribution in the Five States with the Most Breweries",
+       caption = "@Joe_Stoica")
+ggsave(boxplot, filename = "boxplot.png")
+```
+
+```{r}
+# Doesn't work, but wasn't great anyway
+library(maps)
+# Map Data 
+map_data <- map_data("state")
+
+# Join to state data
+map_data <- map_data %>% 
+  left_join(beers %>% group_by(region) %>% count(), by = "region")
+
+ggplot() +
+  geom_polygon(data = map_data,
+               aes(x = long, 
+                   y = lat,
+                   group = group, 
+                   fill = n),
+               color = "white",
+               size = 0.25) +
+  scale_fill_gradient(low = "light grey", 
+                      high = "dark red",
+                      na.value = "white",
+                      guide = "colorbar") +
+  labs(title = "Number of Breweries per State",
+       caption = "@Joe_Stoica") +
+  theme(plot.title = element_text(hjust = 0.5, size = 15),
+        legend.title = element_blank(), 
+        legend.position = "top",
+        legend.text = element_text(size = 8),
+        panel.background = element_blank(),
+        plot.background = element_blank(),
+        panel.grid = element_blank(),
+        axis.text = element_blank(),
+        axis.title = element_blank(),
+        axis.ticks = element_blank()
+  )
+
+```
+
+```{r}
+top_5 <- beers %>% 
+  group_by(region) %>%  
+  count() %>% 
+  arrange(desc(n)) %>% 
+  ungroup() %>% 
+  top_n(5)
+
+beers %>% 
+  filter(region %in% top_5$region) %>% 
+  ggplot(aes(abv, ibu)) +
+  geom_point(aes(color = region))
+```
+
+```{r}
+beers %>% 
+  filter(region %in% c("Colorado", "California", "Michigan", "Oregon", "Texas"),
+         style %in% top_10_styles$style) %>% 
+  ggplot(aes(x = region, y = ibu)) +
+  geom_jitter(aes(color = style)) + 
+  theme_fivethirtyeight() +
+  theme(legend.position = "right",
+        legend.direction = "vertical")
+```

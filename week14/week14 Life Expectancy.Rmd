@@ -1,0 +1,123 @@
+---
+title: "Week 14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggthemes)
+library(knitr)
+library(kableExtra)
+library(maps)
+library(gganimate)
+library(animation)
+library(scales)
+```
+
+```{r}
+life_exp <- read_csv("/Users/Joe/Documents/Github/tidytuesday/data/week14.csv")
+```
+
+```{r}
+life_exp$country <- ifelse(life_exp$country == "United States", "USA", life_exp$country)
+life_exp$country <- ifelse(life_exp$country == "Democratic Republic of Congo", "Democratic Republic of the Congo", life_exp$country)
+life_exp$country <- ifelse(life_exp$country == "Cote d'Ivoire", "Ivory Coast", life_exp$country)
+life_exp$country <- ifelse(life_exp$country == "Congo", "Republic of Congo", life_exp$country)
+life_exp$country <- ifelse(life_exp$country == "United States", "USA", life_exp$country)
+life_exp$country <- ifelse(life_exp$country == "United Kingdom", "UK", life_exp$country)
+life_exp$country <- ifelse(life_exp$country == "Serbia (including Kosovo)", "Serbia", life_exp$country)
+```
+
+```{r}
+life_1950 <- life_exp %>% 
+  group_by(country) %>% 
+  filter(year == 1950)
+
+life_2015 <- life_exp %>% 
+  group_by(country) %>% 
+  filter(year == 2015)
+
+exp_change <- life_1950 %>% 
+  bind_cols(life_2015) %>% 
+  mutate(change = round(life_expectancy1 - life_expectancy, 2)) %>% 
+  mutate(percent_change = round(change / life_expectancy * 100, 2)) %>% 
+  arrange(desc(percent_change))
+
+ten_highest <- exp_change %>% 
+  ungroup() %>% 
+  select(country, change, percent_change) %>% 
+  top_n(10) 
+
+ten_lowest <- exp_change %>% 
+  ungroup() %>% 
+  select(country, change, percent_change) %>% 
+  top_n(-10)
+
+top_10 <- bind_cols(ten_highest, ten_lowest)
+
+top_10$change <- paste("+", top_10$change)
+top_10$change1 <- paste("+", top_10$change1)
+top_10$percent_change <- paste0(top_10$percent_change, "%")
+top_10$percent_change1 <- paste0(top_10$percent_change1, "%")
+
+top_10 %>% 
+  kable(caption = "Top Ten Countries with the Largest and Smallest Percent Change in Life Expectancy (1950 - 2015)",
+        col.names = c("Country", "Difference in Years", "Largest Percent Change",
+                      "Country", "Difference in Years", "Smallest Percent Change")) %>% 
+  kable_styling() 
+```
+
+```{r}
+map.world <- map_data ("world")
+map.world <- left_join(map.world, exp_change, by = c("region" = "country"))
+
+ggplot() +
+  geom_polygon(data = map.world,
+               aes(x = long, 
+                   y = lat,
+                   group = group, 
+                   fill = percent_change),
+               color = "white",
+               size = 0.25) +
+  scale_fill_gradient(low = "light grey", 
+                      high = "dark green",
+                      na.value = "white",
+                      guide = "colorbar") +
+  labs(title = "Global Percent Change in Life Expectancy (1950 - 2015)",
+       caption = "@Joe_Stoica") +
+  theme(plot.title = element_text(hjust = 0.5, size = 15),
+        legend.title = element_blank(), 
+        legend.position = "top",
+        legend.text = element_text(size = 12),
+        panel.background = element_blank(),
+        plot.background = element_blank(),
+        panel.grid = element_blank(),
+        axis.text = element_blank(),
+        axis.title = element_blank(),
+        axis.ticks = element_blank()
+        )
+  
+```
+
+```{r}
+p <- ggplot() +
+  geom_density(data = life_exp %>% filter(year >= 1950),
+               fill = "#5e8c9e",
+               aes(life_expectancy,
+                   frame = year, 
+                   cumulative = FALSE)) +
+  theme_fivethirtyeight() +
+  labs(subtitle = "Global Changes in Life Expectancy (1950 -2015)",
+       caption = "@Joe_Stoica") + 
+  theme(axis.title = element_text())+
+  xlab("Life Expectancy") +
+  ylab("Density") +
+  NULL
+
+
+ani.options(interval = .15)
+# Not working with gganimate update?
+gganimate(p)
+```
+
