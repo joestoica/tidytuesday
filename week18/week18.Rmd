@@ -1,0 +1,190 @@
+---
+title: "Week 18: Dallas Animal Shelter"
+author: Joe Stoica
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggthemes)
+library(lubridate)
+
+blue <- "#6093ca"
+red <- "#D25B41"
+yellow <- "#D2B765"
+my_colors <- c('#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99',
+               '#e31a1c','#fdbf6f','#ff7f00','#cab2d6','#6a3d9a',
+               '#C2C23F')
+
+'%!in%' <- function(x,y)!('%in%'(x,y))
+```
+
+```{r}
+animals <- read_csv("/Users/Joe/Documents/github/tidytuesday/data/week18_dallas_animals.csv")
+
+animals <- animals %>% 
+  select(animal_type, animal_breed, intake_date, intake_type, outcome_date, 
+         outcome_type, chip_status, animal_origin) %>% 
+  mutate(intake_date = mdy(intake_date),
+         outcome_date = mdy(outcome_date),
+         elapsed_days = outcome_date - intake_date,
+         animal_type = str_to_title(animal_type),
+         animal_breed = str_to_title(animal_breed),
+         outcome_type = str_to_title(outcome_type))
+```
+
+```{r}
+top_dogs <- animals %>%
+  filter(animal_type == "Dog") %>%
+  select(animal_breed, elapsed_days) %>%
+  group_by(animal_breed) %>% 
+  count() %>% 
+  arrange(desc(n)) %>% 
+  ungroup() %>% 
+  top_n(4) 
+
+dogs <- dput(top_dogs$animal_breed)
+
+top_5_methods <- animals %>%
+  group_by(outcome_type) %>% 
+  count() %>% 
+  arrange(desc(n))%>%
+  ungroup() %>% 
+  top_n(5, n)
+
+outcome_factors<- c("Adoption", 
+                    "Euthanized",
+                    "Returned To Owner",
+                    "Transfer",
+                    "Lost Report",
+                    "Other")
+
+doggos <- animals %>% 
+  mutate(outcome_type = ifelse(outcome_type %!in% unique(top_5_methods$outcome_type), 
+                               "Other", 
+                               outcome_type)) %>% 
+  filter(animal_breed %in% dogs) %>% 
+  select(animal_breed, outcome_type) %>% 
+  group_by(animal_breed, outcome_type) %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(animal_breed = factor(animal_breed, dogs),
+         outcome_type = factor(outcome_type, outcome_factors)) %>% 
+  ggplot(aes(animal_breed, n)) +
+  geom_bar(stat = "identity", position = "dodge", aes(fill = outcome_type)) +
+  facet_wrap(.~animal_breed, scales = "free_x") +
+  theme_fivethirtyeight() + 
+  theme(axis.text = element_text(),
+        axis.text.x = element_blank(),
+        legend.direction = "vertical",
+        legend.position = "right",
+        legend.text = element_text(size = 8),
+        legend.title = element_text(hjust = 0.5),
+        plot.title = element_text(hjust = 0.5,size = 13)) +
+  labs(title = "What Happens to Dallas Animal Shelter's Most Frequent Dog Breeds?",
+       caption = "@Joe_Stoica") + 
+  scale_fill_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3','#ff7f00', "grey"),
+                    name = "Outcome")
+
+ggsave(doggos, filename = "puppers.png")
+```
+
+```{r}
+adoption <- animals %>% 
+  filter(outcome_type == "Adoption") %>% 
+  group_by(elapsed_days) %>% 
+  ggplot(aes(elapsed_days)) +
+  geom_bar(fill = blue) +
+  scale_x_continuous(breaks = seq(0, 55, 5),
+                     limits = c(0, 60)) + 
+  scale_y_continuous(breaks = seq(0, 1500, 100)) + 
+  theme_fivethirtyeight()+
+  theme(axis.title = element_text(),
+        plot.caption = element_text(size = 8),
+        plot.title = element_text(size = 14))+
+  xlab("Days Elapsed") +
+  ylab("Count") +
+  labs(title = "Days Elapsed Until Animal is Adopted at Dallas Animal Shelter",
+       caption = "@Joe_Stoica") 
+
+ggsave(adoption, filename = "adoption.png")
+```
+
+```{r}
+date_factors <- c("Oct 2016", "Nov 2016","Dec 2016", 
+                  "Jan 2017", "Feb 2017","Mar 2017", 
+                  "Apr 2017", "May 2017",  "Jun 2017",
+                  "Jul 2017", "Aug 2017", "Sep 2017", 
+                  "Oct 2017")
+
+remake_df <- animals %>% 
+  select(animal_type, outcome_type, outcome_date) %>% 
+  filter(outcome_type == "Adoption") %>% 
+  arrange(outcome_date) %>% 
+  mutate(outcome_date = format(outcome_date, "%b %Y"),
+         outcome_date = factor(outcome_date, levels = date_factors),
+         animal_type = case_when(
+           animal_type == "Bird" ~ "Other",
+           animal_type == "Wildlife" ~ "Other",
+           animal_type == "Livestock" ~ "Other",
+           TRUE ~ animal_type)) %>% 
+  group_by(outcome_date, animal_type) %>% 
+  count() %>% 
+  na.omit() 
+
+remake <- remake_df %>% 
+  ungroup() %>% 
+  mutate(animal_type = factor(animal_type, levels = c( "Dog", "Cat", "Other"))) %>% 
+  ggplot(aes(x = outcome_date, y = n, group = 1)) +
+  geom_line(aes(group = animal_type, color = animal_type), size = 1.1) +
+  scale_y_continuous(breaks = seq(0,1500,100)) +
+  scale_color_manual(values = c(blue, yellow, red)) + 
+  #scale_color_manual(values = c("#6093ca", "#D2B765", "#D25B41")) + 
+  theme_fivethirtyeight() + 
+  theme(axis.text = element_text(),
+        plot.caption = element_text(size = 8),
+        plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(size = 8, angle = 45),
+        legend.position = "top",
+        legend.text = element_text(size = 14),
+        legend.title = element_blank()) +
+  guides(color = guide_legend(keywidth = 3,
+                              keyheight = .75, 
+                              title=NULL, 
+                              label.position = "top", 
+                              label.hjust = 0.5)) +
+  labs(x = "animal", 
+       y = "Adoptions",
+       title = "Shelter Animal Adoptions per Month", 
+       caption = "@Joe_Stoica")
+
+ggsave(remake, filename = "remake.png")
+``` 
+
+
+```{r}
+animals %>% 
+  filter(animal_breed %in% dogs) %>% 
+  select(animal_breed, outcome_type) %>% 
+  group_by(animal_breed, outcome_type) %>% 
+  count() %>% 
+  ggplot(aes(reorder(animal_breed, as.numeric(n)), n)) +
+  geom_bar(stat = "identity", aes(fill = outcome_type)) +
+  coord_flip() + 
+  theme_fivethirtyeight() +
+  theme(axis.text = element_text(),
+        axis.text.x = element_text(size = 8),
+        axis.text.y = element_text(size = 8), 
+        legend.direction = "vertical",
+        legend.key.size = unit(0.8,"line"),
+        legend.position = "right",
+        legend.text = element_text(size = 8),
+        plot.title = element_text(hjust = 0.5),
+        plot.caption = element_text(hjust = 1)) + 
+  labs(title = "Dogs dogs dogs", 
+       caption = "@Joe_Stoica") + 
+  scale_fill_manual(name = "Outcome",
+                    values = my_colors) + 
+  scale_y_continuous(breaks = seq(0,10000, 500))
+```

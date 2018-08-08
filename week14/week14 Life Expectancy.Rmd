@@ -1,5 +1,5 @@
 ---
-title: "Week 14"
+title: "Tidy TuesdayWeek 14"
 output: html_document
 ---
 
@@ -10,14 +10,21 @@ library(ggthemes)
 library(knitr)
 library(kableExtra)
 library(maps)
-library(gganimate)
+#library(gganimate)
 library(animation)
 library(scales)
 ```
 
-```{r}
+Tidy Tuesday is a data project hosted every week by the [R for Data Science learning community.](https://github.com/rfordatascience/tidytuesday) Anyone is welcome to participate, and are encouraged to colloborate and share their findings on Twitter with the [R4DS community](https://twitter.com/R4DScommunity).This week we are examining global life expectancy from [this article](https://ourworldindata.org/life-expectancy).  
+
+
+```{r, echo = FALSE, include=FALSE}
 life_exp <- read_csv("/Users/Joe/Documents/Github/tidytuesday/data/week14.csv")
 ```
+
+## Data Cleaning
+In order to use the maps library built in mapping data, the country names had to
+match one another in order to be joined correctly. 
 
 ```{r}
 life_exp$country <- ifelse(life_exp$country == "United States", "USA", life_exp$country)
@@ -28,6 +35,14 @@ life_exp$country <- ifelse(life_exp$country == "United States", "USA", life_exp$
 life_exp$country <- ifelse(life_exp$country == "United Kingdom", "UK", life_exp$country)
 life_exp$country <- ifelse(life_exp$country == "Serbia (including Kosovo)", "Serbia", life_exp$country)
 ```
+
+# Making a Table to Highlight Global Percent Change
+
+I thought it would be interesting to examine which countries saw the biggest and
+the smallest improvements in life expectancy. I first separated the data into two 
+new data frames, one for the year 1950 and opne for the year 2015. I then joined 
+the two together and found the difference for every country's change in life 
+expectancy and then also calculated the percent change.
 
 ```{r}
 life_1950 <- life_exp %>% 
@@ -52,7 +67,8 @@ ten_highest <- exp_change %>%
 ten_lowest <- exp_change %>% 
   ungroup() %>% 
   select(country, change, percent_change) %>% 
-  top_n(-10)
+  top_n(-10) %>% 
+  arrange(percent_change)
 
 top_10 <- bind_cols(ten_highest, ten_lowest)
 
@@ -68,11 +84,31 @@ top_10 %>%
   kable_styling() 
 ```
 
+This table is the final result. To me, this table is super encouraging because no
+country had decreases in life expectancy. The countries that changed the most 
+are traditionally considered as "developing" countries. This speaks volumes in 
+terms of improvements in available health care and overall growth as countries. 
+The majority of the countries with the smallest percent change are countries with
+solid health care, so it makes sense that they didnt see large increases in this 
+period. This table is neat to show the overall picture, but I think it's weakness
+lies in the sense that it doesn't show  what happened betweened these years, just 
+the two end points. 
+
+# Creating a Choropleth World Map
+Using the data from above, I wanted to create a global map showing these increases 
+to help visualize the entire picture, not just a select number of countries.
+
+
+
+
+## Creating the map
+Nothing fancy here, I just joined the mapping data with our dataset. 
+
 ```{r}
-map.world <- map_data ("world")
+map.world <- map_data("world")
 map.world <- left_join(map.world, exp_change, by = c("region" = "country"))
 
-ggplot() +
+map <- ggplot() +
   geom_polygon(data = map.world,
                aes(x = long, 
                    y = lat,
@@ -97,10 +133,21 @@ ggplot() +
         axis.title = element_blank(),
         axis.ticks = element_blank()
         )
-  
+map
 ```
 
-```{r}
+```{r echo=FALSE, include=FALSE}
+ggsave(map, filename = "map.png")
+```
+
+# Animating Life Expectancy Across the Entire Time Period
+I have never worked with gganimate before, so I thought this would be a good time 
+to learn how to use it! Note: As of 7/15/18, I can no longer run this code due to 
+gganimate being completely redone. Once the final version is published to CRAN,
+I will come back and make this run again. Here is a tweet showing the final
+gif though!
+
+```{r, warning=FALSE}
 p <- ggplot() +
   geom_density(data = life_exp %>% filter(year >= 1950),
                fill = "#5e8c9e",
@@ -112,12 +159,11 @@ p <- ggplot() +
        caption = "@Joe_Stoica") + 
   theme(axis.title = element_text())+
   xlab("Life Expectancy") +
-  ylab("Density") +
-  NULL
+  ylab("Density") 
 
-
-ani.options(interval = .15)
-# Not working with gganimate update?
-gganimate(p)
+#gganimate(p, interval = 0.1)
 ```
+
+
+
 

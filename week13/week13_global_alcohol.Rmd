@@ -1,25 +1,50 @@
 ---
-title: 'Week 13: Global Alcohol Consumption'
+title: 'Tidy Tuesday Week 13: Global Alcohol Consumption'
 author: Joe Stoica
 date: 6/29/2018
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
 library(tidyverse)
 library(ggthemes)
 library(knitr)
 library(kableExtra)
 ```
 
-```{r read in data}
+Tidy Tuesday is a data project hosted every week by the [R for Data Science learning community.](https://github.com/rfordatascience/tidytuesday) Anyone is welcome to participate, and are encouraged to colloborate and share their findings on Twitter with the [R4DS community](https://twitter.com/R4DScommunity).This week we are examining global alcohol consumption using the dataset from this 
+[Fivethirtyeight article](https://fivethirtyeight.com/features/dear-mona-followup-where-do-people-drink-the-most-beer-wine-and-spirits/). 
+
+
+
+```{r read in data, echo=FALSE}
 # Windows
 #consumption <- read_csv("C:/Users/Joe/Documents/Github/tidytuesday/data/week13_alcohol_global.csv")
 
 # Mac
 consumption <- read_csv("/Users/Joe/Documents/Github/tidytuesday/data/week13_alcohol_global.csv")
 ```
+
+# Examining the Data
+```{r}
+head(consumption)
+```
+
+The above table shows the first six rows in our data frame. We are given a country,
+and the number of servings of beer, spirits, and wine consumed by that country, 
+as well as the total liters of pure alcohol. It is important to note that this 
+column is not the sum of servings.
+
+# Remaking the Table from the 538 Article
+I wanted to start this week off by recreating the table shown in the article, which
+displays the top ten countries that consumes the most beer, spirits, and wine. 
+
+The first step is to separate our data frame into three smaller data frames by 
+drink, get the top ten highest serving values, and then sort them from largest 
+to smallest.
 
 ```{r 538 table remake}
 beer <- consumption %>% 
@@ -36,7 +61,12 @@ wine <- consumption %>%
   select(country, Wine = wine_servings) %>% 
   top_n(10) %>% 
   arrange(desc(Wine))
+```
 
+Once we have those, we bind those three data frames into one and create our table 
+using the kable function.
+
+```{r}
 alcohol <- bind_cols(beer, spirit, wine)
 
 alcohol %>% 
@@ -45,23 +75,30 @@ alcohol %>%
   kable_styling() 
 ```
 
+
+
+# Highest Pure Alcohol Consumption
+I thought it would be interesting to look at pure alcohol consumption next. 
+I followed a similar process as above, grabbing the top 20 countries with the
+highest pure alcohol consumption.
+
 ```{r top 20 plot}
-top10 <- consumption %>% 
-  top_n(10) %>% 
-  select(country, Beer = beer_servings, Spirits = spirit_servings, Wine =  wine_servings) %>% 
-  gather(key = drink, value = qty, -country) %>% 
-  group_by(country)
 
 top20 <- consumption %>% 
   top_n(20) %>% 
   select(country, Beer = beer_servings, Spirits = spirit_servings, Wine =  wine_servings) %>% 
   gather(key = drink, value = qty, -country) %>% 
   group_by(country)
+```
 
+Now that the data is tidied up, I thought a stacked bar chart would be a great 
+way to display not only pure alcohol consumption, but also which kind of alcohol
+comprises that countries consumption.
 
+```{r}
 plot <- ggplot(top20, aes(reorder(country, qty),
-                  qty,
-                  fill = drink)) +
+                          qty,
+                          fill = drink)) +
   geom_bar(stat = "identity")+
   theme_fivethirtyeight() +
   coord_flip() +
@@ -81,15 +118,34 @@ plot <- ggplot(top20, aes(reorder(country, qty),
   scale_fill_manual(values = c("#0392cf", "#7bc043", "#ee4035"))
 
 plot
-
-
-#ggsave("top20.png", plot)
 ```
+
+```{r, echo=FALSE}
+ggsave("top20.png", plot)
+```
+
+We now have this lovely graphic. It has the highest consumer (Andorra) on top, 
+and the lowest (the UK) on bottom, as well as their servings of alcohol. I think 
+it is very interesing how each country is unique in how it drinks, because there
+are few similarities in the distribution of servings. 
+
+# Sankey Diagram
+
+This is very similar to above, however I looked at the top ten countries instead 
+of 20. Sankey Diagrams are great for showing how quantities flow from one location 
+to the next. This graphic is unable to be displayed in this 
+document, but you can find it [here](rmd/sankey.html).
 
 ```{r sankey}
 library(devtools)
 install_github("mages/googleVis")
 require(googleVis)
+
+top10 <- consumption %>% 
+  top_n(10) %>% 
+  select(country, Beer = beer_servings, Spirits = spirit_servings, Wine =  wine_servings) %>% 
+  gather(key = drink, value = qty, -country) %>% 
+  group_by(country)
 
 sankey <- plot(gvisSankey(top10,
                           from = "country",

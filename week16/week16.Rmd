@@ -1,0 +1,29 @@
+---
+title: 'Tidy Tuesday Week 16: Exercise'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(readxl)
+library(tidyverse)
+library(sf)
+library(maptools)
+```
+
+```{r}
+exercise1 <- read_xlsx("data/week16_exercise.xlsx", sheet = 1)
+exercise2 <- read_xlsx("data/week16_exercise.xlsx", sheet = 2)
+```
+
+```{r}
+listify <- function(vec) {
+shQuote(vec, type="cmd")
+  }
+
+listify(unique(sort(iris$Species)))
+
+
+```
+
