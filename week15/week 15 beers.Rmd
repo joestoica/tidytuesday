@@ -1,17 +1,30 @@
 ---
-title: "Week 15"
+title: "Tidy Tuesday Week 15: U.S. Craft Breweries"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE,
+                      cache = TRUE,
+                      warning = FALSE,
+                      message = FALSE)
 library(tidyverse)
 library(ggthemes)
 library(kableExtra)
 library(ggridges)
 library(readxl)
+library(ggrepel)
+library(scales)
 ```
 
+# What is Tidy Tuesday?
+Tidy Tuesday is a data project hosted every week by the [R for Data Science learning community.](https://github.com/rfordatascience/tidytuesday) Anyone is welcome to participate, and are encouraged to colloborate and share their findings on Twitter with the [R4DS community](https://twitter.com/R4DScommunity).This week we are examining Craft Breweries around the U.S. with data from [this article](https://www.thrillist.com/news/nation/most-craft-breweries-by-state-united-states). 
+
+***
+
+## Read in Data 
+I read in the two sheets from the excel data, added the full state name from the abbreviation
+using the built-in nifty state.name and state.abb vectors. 
 ```{r join data}
 beers <- read_xlsx("/Users/Joe/Documents/Github/tidytuesday/data/week15_beers.xlsx", sheet = 1)
 breweries <- read_xlsx("/Users/Joe/Documents/Github/tidytuesday/data/week15_beers.xlsx", sheet = 2)
@@ -32,7 +45,40 @@ beers <- beers %>%
 beers$region <- gsub("(\\b[a-z]{1})", "\\U\\1" , beers$region, perl=TRUE)
 ```
 
+*** 
 
+## Top 10 Beer Styles
+I wanted to create a table that shows the top ten most popular beer styles from all of the breweries that showed the beer name, the number of occurrences, the mean ABV, and the 
+mean IBU. 
+```{r}
+# Gets the top 10 styles
+top_10_styles <- beers %>% 
+  # Find the top 10 most popular
+  group_by(style) %>%  
+  count() %>% 
+  arrange(desc(n)) %>% 
+  ungroup() %>% 
+  top_n(10) %>% 
+  # Join the ABV and IBU
+  left_join(beers %>% 
+              group_by(style) %>% 
+              summarise(Mean_ABV = paste(round(mean(na.omit(abv)) * 100, 2), "%"),
+                        Mean_IBU = round(mean(na.omit(ibu)), 2))) 
+
+
+top_10_styles %>% 
+  kable(caption = "Top 10 Beer Styles from U.S. Craft Breweries (NA values omitted)",
+        col.names = c("Beer Style", "Count", "Mean ABV", "Mean IBU"),
+        align = c("l","c", "c", "c")) %>% 
+  kable_styling() 
+```
+
+
+***
+
+# IBU Distributions of the Top 10 Beers
+Next, I wanted to see if there are general trends with IBU in the most popular beers,
+especially because of how popular pale ales are, which are notorious for their hoppiness.
 ```{r warning=FALSE}
 beers_style <- beers %>% 
   filter(style %in% top_10_styles$style)
@@ -55,32 +101,14 @@ joyplot <- beers_style %>%
 ggsave(joyplot, filename = "joyplot.png")
 ```
 
+The three pale ales appear to have higher than typical IBU, which was expected. 
+The other beers seem to share a similar range of IBU although.
+
+***
+
+## ABV vs. IBU Scatterplot
+Next I wanted to see the relationship between ABV and IBU.
 ```{r}
-# Gets the top 10 styles
-top_10_styles <- beers %>% 
-  group_by(style) %>%  
-  count() %>% 
-  arrange(desc(n)) %>% 
-  ungroup() %>% 
-  top_n(10) %>% 
-  left_join(beers %>% group_by(style) %>% summarise(Mean_ABV = mean(na.omit(abv)) * 100,
-                                                    Mean_IBU = mean(na.omit(ibu)))) 
-# Cleaning for table output
-top_10_styles$Mean_ABV <- round(top_10_styles$Mean_ABV, 2)
-top_10_styles$Mean_IBU <- round(top_10_styles$Mean_IBU, 2)
-top_10_styles$Mean_ABV <- paste(top_10_styles$Mean_ABV, "%")
-
-top_10_styles %>% 
-  kable(caption = "Top 10 Beer Styles from U.S. Craft Breweries (NA values omitted)",
-        col.names = c("Beer Style", "Count", "Mean ABV", "Mean IBU"),
-        align = c("l","c", "c", "c")) %>% 
-  kable_styling() 
-```
-
-```{r}
-library(ggrepel)
-library(scales)
-
 scatter <- beers %>% 
   group_by(style) %>%  
   summarise(mean_ABV = mean(na.omit(abv)),
@@ -108,6 +136,13 @@ scatter <- beers %>%
 ggsave(scatter, filename = "scatter.png")
 ```
 
+There appears to be a general positive trend between ABV and IBU. I also labeled 
+the top 10 most popular beers from above. The size correlates to the occurrences 
+of the beer in the data. 
+
+***
+
+## Bar Chart Remake
 ```{r warning=FALSE}
 top_5 <- beers %>% 
   group_by(region) %>% 
@@ -148,6 +183,12 @@ remake <- top_5 %>%
 ggsave(remake, filename = "remake.png")
 ```
 
+Strangely, the data returned different numbers from those in the article. Another 
+twitter user got the same numbers as I did, and our approaches were slightly different.
+
+***
+
+## IBU by Top Five States with Most Breweries 
 ```{r}
 boxplot <- beers %>% 
   filter(region %in% c("Colorado", "California", 
@@ -166,44 +207,10 @@ boxplot <- beers %>%
 ggsave(boxplot, filename = "boxplot.png")
 ```
 
-```{r}
-# Doesn't work, but wasn't great anyway
-library(maps)
-# Map Data 
-map_data <- map_data("state")
+***
 
-# Join to state data
-map_data <- map_data %>% 
-  left_join(beers %>% group_by(region) %>% count(), by = "region")
-
-ggplot() +
-  geom_polygon(data = map_data,
-               aes(x = long, 
-                   y = lat,
-                   group = group, 
-                   fill = n),
-               color = "white",
-               size = 0.25) +
-  scale_fill_gradient(low = "light grey", 
-                      high = "dark red",
-                      na.value = "white",
-                      guide = "colorbar") +
-  labs(title = "Number of Breweries per State",
-       caption = "@Joe_Stoica") +
-  theme(plot.title = element_text(hjust = 0.5, size = 15),
-        legend.title = element_blank(), 
-        legend.position = "top",
-        legend.text = element_text(size = 8),
-        panel.background = element_blank(),
-        plot.background = element_blank(),
-        panel.grid = element_blank(),
-        axis.text = element_blank(),
-        axis.title = element_blank(),
-        axis.ticks = element_blank()
-  )
-
-```
-
+## Stuff I didn't really like the direction of where it was heading
+### IBU vs ABV in Top Five States with Most Breweries
 ```{r}
 top_5 <- beers %>% 
   group_by(region) %>%  
@@ -217,6 +224,10 @@ beers %>%
   ggplot(aes(abv, ibu)) +
   geom_point(aes(color = region))
 ```
+
+No distinct clusterings, which is what I expected.
+
+***
 
 ```{r}
 beers %>% 

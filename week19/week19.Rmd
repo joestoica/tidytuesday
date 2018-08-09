@@ -1,0 +1,64 @@
+---
+title: "Tidy Tuesday Week 19"
+author: "Joe Stoica"
+date: "8/8/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggthemes)
+```
+
+```{r data read in}
+airlines <- read_csv("week19.csv")
+airlines <- airlines %>% 
+  select(-X1)
+```
+
+```{r}
+incident_changes <- airlines %>%
+  select(airline, year_range, n_events, seats = avail_seat_km_per_week) %>%
+  group_by(airline, year_range, seats) %>% 
+  summarise(total = sum(n_events)) %>% 
+  spread(year_range, total) %>% 
+  select(airline, seats, old = `85_99`, recent = `00_14`)%>% 
+  mutate(change = recent - old,
+         type = ifelse(change > 0, "increase",
+                       ifelse(change < 0, "decrease", "no change"))) %>% 
+  ungroup()
+```
+
+```{r}
+a <- 0.5
+
+incident_changes %>%
+  mutate(airline = as.factor(airline) %>% fct_reorder(seats, min)) %>% 
+  ggplot(aes(x = airline, y = old)) +
+  geom_segment(aes(xend = airline, yend = recent, color = type), size = 1) + 
+  geom_point(aes(y = old), color = "red", alpha = a) +
+  geom_point(aes(y = recent), color = "blue", alpha = a) +
+  coord_flip() + 
+  scale_color_manual(values = c("black", "#0198e1","white")) +
+  #facet_grid(type ~ ., scales = "free_y") +
+  theme_fivethirtyeight()
+  NULL
+```
+
+
+
+```{r}
+f1 <- function(f){
+  function(x){
+    ifelse(x < 2, 1, x * f(f)(x - 1))
+  }
+}
+
+f1(f1)(5)
+
+"<-"(a,10)
+a
+```
+
+
